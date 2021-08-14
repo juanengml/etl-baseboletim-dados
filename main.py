@@ -4,8 +4,15 @@ import time
 import pandas as pd
 from datetime import datetime as dt, timedelta as delta
 from utils import checking_valid_dates as check_dt
+import dataset
 from console_logging.console import Console
+import os 
+
 console = Console()
+url_db = "mysql://root:asdqwe123@firmadataflavor.ddns.net/Fluffy" #os.getenv("DATABASE_URL")
+
+db = dataset.connect(url_db)
+table = db['tbl_baseboletim']
 
 endpoint = "https://ptax.bcb.gov.br/ptax_internet/consultaBoletim.do?method=gerarCSVFechamentoMoedaNoPeriodo&ChkMoeda=61&DATAINI={}&DATAFIM={}"
  
@@ -34,13 +41,12 @@ def transformacao_base_cotacao(df):
 def load_base_cotacao(moeda,df):
     console.info("[L] - Carregando Base to CSV")
     df.to_csv("final_{}.csv".format(moeda),index=False)
-    console.success("Base: final_{}.csv".format(moeda))
- 
+    console.success("Base final_{}.csv".format(moeda))
 
 def job():
     cowsay.cow('É Nois que AVOAA POHA ')
     # regra de busca de dados - dia atual - 10
-    dt_inicial =  str(dt.now().date() - delta(days=3))
+    dt_inicial =  str(dt.now().date() - delta(days=20))
     dt_final =    str(dt.now().date()) 
 
     dt_inicial = dt.strptime(dt_inicial, "%Y-%m-%d").strftime("%d/%m/%Y")
@@ -71,15 +77,18 @@ def job():
     base_eur.drop(['Data'],inplace=True,axis=1)
 
     final_base = pd.concat([base_usd,base_eur],axis=1)
-    final_base.to_csv("final.csv",index=False)
-    console.success("Base: final.csv")
+    #final_base.to_csv("final.csv",index=False)
+    r = [table.insert(data) for data in final_base.T.to_dict().values()]
+    console.success("Base.csv to SQL insert...")
+
 
 def main():
-  schedule.every().day.at("02:16").do(job)
-  #while True:
-  #  cowsay.cow('{} Aguardando....'.format(dt.now()))
-  #  schedule.run_pending()
-  #  time.sleep(1)
-  job()
+  
+  schedule.every(5).minutes.do(job)
+  while True:
+    cowsay.cow('{} Aguardando....'.format(dt.now()))
+    schedule.run_pending()
+    time.sleep(1)
+ 
 if __name__ == "__main__":
   main()
